@@ -6,19 +6,20 @@ import (
 )
 
 type ProductRepositoryMysql struct {
-	Querier   db.Querier
-	ForUpdate bool
+	Querier db.Querier
 }
 
-func (r ProductRepositoryMysql) InitTx(tx *db.Tx) db.ProductRepository {
-	r.Querier = tx.Tx
+func (r *ProductRepositoryMysql) Save(product *domain.Product, config ...*db.RepoConfig) error {
+	querier := r.Querier
 
-	return &r
-}
+	for _, v := range config {
+		v.Apply(&db.RepoConfigValue{
+			Querier: &querier,
+		})
+	}
 
-func (r ProductRepositoryMysql) Save(product *domain.Product) error {
-	_, err := r.Querier.Exec(`INSERT INTO product (sku, name, available_quantity) VALUES (?, ?, ?)
-		ON DUPLICATE KEY UPDATE sku = ?, name = ?, available_quantity = ?`,
+	_, err := querier.Exec(`INSERT INTO product (sku, name, available_quantity) VALUES (?, ?, ?)
+	ON DUPLICATE KEY UPDATE sku = ?, name = ?, available_quantity = ?`,
 		product.SKU, product.Name, product.AvailableStock,
 		product.SKU, product.Name, product.AvailableStock)
 	if err != nil {
@@ -28,7 +29,7 @@ func (r ProductRepositoryMysql) Save(product *domain.Product) error {
 	return nil
 }
 
-func (r ProductRepositoryMysql) FindAll() ([]*domain.Product, error) {
+func (r *ProductRepositoryMysql) FindAll() ([]*domain.Product, error) {
 	products := []*domain.Product{}
 
 	rows, err := r.Querier.Query("SELECT sku, name, available_quantity FROM product")
@@ -48,10 +49,20 @@ func (r ProductRepositoryMysql) FindAll() ([]*domain.Product, error) {
 	return products, nil
 }
 
-func (r ProductRepositoryMysql) FindBySKU(sku string) (*domain.Product, error) {
+func (r *ProductRepositoryMysql) FindBySKU(sku string, config ...*db.RepoConfig) (*domain.Product, error) {
+	query := `SELECT sku, name, available_quantity
+		FROM product WHERE sku = ?`
+	querier := r.Querier
+
+	for _, v := range config {
+		v.Apply(&db.RepoConfigValue{
+			Querier: &querier,
+			Query:   &query,
+		})
+	}
+
 	p := &domain.Product{}
-	err := r.Querier.QueryRow(`SELECT sku, name, available_quantity
-		FROM product WHERE sku = ? FOR UPDATE`, sku).Scan(&p.SKU, &p.Name, &p.AvailableStock)
+	err := querier.QueryRow(query, sku).Scan(&p.SKU, &p.Name, &p.AvailableStock)
 	if err != nil {
 		return nil, err
 	}

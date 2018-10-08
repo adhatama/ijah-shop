@@ -21,15 +21,15 @@ type Server struct {
 }
 
 func NewServer(db *db.DB) (*Server, error) {
-	productRepo := mysql.ProductRepositoryMysql{
+	productRepo := &mysql.ProductRepositoryMysql{
 		Querier: db.DB,
 	}
 
-	incomingProductRepo := mysql.IncomingProductRepositoryMysql{
+	incomingProductRepo := &mysql.IncomingProductRepositoryMysql{
 		Querier: db.DB,
 	}
 
-	productService := service.ProductService{
+	productService := &service.ProductService{
 		ProductRepo: productRepo,
 	}
 
@@ -46,6 +46,7 @@ func NewServer(db *db.DB) (*Server, error) {
 func (s *Server) Mount(e *echo.Group) {
 	e.POST("/products", s.SaveProduct)
 	e.GET("/products", s.GetProducts)
+	e.GET("/products/:sku", s.GetProductBySKU)
 
 	e.POST("/incoming_products", s.SaveIncomingProduct)
 	e.POST("/receive_orders", s.ReceiveOrder)
@@ -83,6 +84,19 @@ func (s *Server) GetProducts(c echo.Context) error {
 
 	data := make(map[string]interface{})
 	data["data"] = products
+
+	return c.JSON(http.StatusOK, data)
+}
+
+func (s *Server) GetProductBySKU(c echo.Context) error {
+	product, err := s.ProductRepo.FindBySKU(c.Param("sku"))
+	if err != nil {
+		log.Error(err.Error())
+		return c.JSON(http.StatusInternalServerError, err)
+	}
+
+	data := make(map[string]interface{})
+	data["data"] = product
 
 	return c.JSON(http.StatusOK, data)
 }
@@ -136,17 +150,24 @@ func (s *Server) ReceiveOrder(c echo.Context) error {
 	// Begin processing
 
 	tx, err := s.DB.Begin()
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, err)
+	}
+
+	repoConfig := &db.RepoConfig{
+		Tx: &db.Tx{tx},
+	}
 
 	// Gathers data
 
-	incProd, err := s.IncomingProductRepo.InitTx(tx).IsForUpdate(true).FindByIDAndSKU(id, sku)
+	incProd, err := s.IncomingProductRepo.FindByIDAndSKU(id, sku, repoConfig)
 	if err != nil {
 		log.Error(err.Error())
 		tx.Rollback()
 		return c.JSON(http.StatusInternalServerError, err)
 	}
 
-	prod, err := s.ProductRepo.InitTx(tx).FindBySKU(sku)
+	prod, err := s.ProductRepo.FindBySKU(sku, repoConfig)
 	if err != nil {
 		log.Error(err.Error())
 		tx.Rollback()
@@ -171,14 +192,14 @@ func (s *Server) ReceiveOrder(c echo.Context) error {
 
 	// Persists
 
-	err = s.IncomingProductRepo.InitTx(tx).Save(incProd)
+	err = s.IncomingProductRepo.Save(incProd, repoConfig)
 	if err != nil {
 		log.Error(err.Error())
 		tx.Rollback()
 		return c.JSON(http.StatusInternalServerError, err)
 	}
 
-	err = s.ProductRepo.InitTx(tx).Save(prod)
+	err = s.ProductRepo.Save(prod, repoConfig)
 	if err != nil {
 		log.Error(err.Error())
 		tx.Rollback()

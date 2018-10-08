@@ -46,12 +46,24 @@ func (tx *Tx) QueryRow(query string, args ...interface{}) *sql.Row {
 	return tx.QueryRow(query, args)
 }
 
-func (db *DB) Begin() (*Tx, error) {
-	tx, err := db.DB.Begin()
-	if err != nil {
-		return nil, err
+type RepoConfig struct {
+	Tx *Tx
+}
+
+type RepoConfigValue struct {
+	Querier *Querier
+	Query   *string
+}
+
+func (c *RepoConfig) Apply(value *RepoConfigValue) {
+	if c.Tx != nil && value.Querier != nil {
+		*value.Querier = c.Tx.Tx
+
+		if value.Query != nil {
+			q := *value.Query + " FOR UPDATE"
+			*value.Query = q
+		}
 	}
-	return &Tx{tx}, nil
 }
 
 func NewMysql() *DB {
@@ -64,20 +76,15 @@ func NewMysql() *DB {
 }
 
 type ProductRepository interface {
-	InitTx(tx *Tx) ProductRepository
-
-	Save(product *domain.Product) error
+	Save(product *domain.Product, config ...*RepoConfig) error
 	FindAll() ([]*domain.Product, error)
-	FindBySKU(sku string) (*domain.Product, error)
+	FindBySKU(sku string, config ...*RepoConfig) (*domain.Product, error)
 }
 
 type IncomingProductRepository interface {
-	InitTx(tx *Tx) IncomingProductRepository
-	IsForUpdate(val bool) IncomingProductRepository
-
-	Save(product *domain.IncomingProduct) error
+	Save(product *domain.IncomingProduct, config ...*RepoConfig) error
 	FindAll() ([]*domain.IncomingProduct, error)
-	FindByID(id string) ([]*domain.IncomingProduct, error)
-	FindByIDAndSKU(id, sku string) (*domain.IncomingProduct, error)
-	FindByUID(uid uuid.UUID) (*domain.IncomingProduct, error)
+	FindByID(id string, config ...*RepoConfig) ([]*domain.IncomingProduct, error)
+	FindByIDAndSKU(id, sku string, config ...*RepoConfig) (*domain.IncomingProduct, error)
+	FindByUID(uid uuid.UUID, config ...*RepoConfig) (*domain.IncomingProduct, error)
 }
