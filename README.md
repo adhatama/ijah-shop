@@ -7,7 +7,7 @@ For the complete instruction, please see [this link](https://www.dropbox.com/s/7
 
 It uses Onion / Hexagonal / Clean architectures in a simpler way. It uses 3 layers: the deepest domain layer, the infrastructure (databases), and the application layer (http server, serialization, etc)
 
-![diagram](https://ucc9296cffb79b303700649379c9.dl.dropboxusercontent.com/cd/0/inline/ASSG_xlLxRUjmgLtyVt-YrZUULaLGrQR5IqoUVvANMi6Xp34TR4lElrjc4Pv9aRDaB1lRffYM-C9yck0i3WxJTX24R7ufqPAXwlY5aK3tqlKYV9sMCVv1cfYT9UC6LSk7qN_Kt8X3voh1rd66jgGNuxtYSCbajVuMxyoyqN32ZkwfKMTx1mKf-J70rRjLkIebLE/file)
+![diagram](https://dl.dropboxusercontent.com/s/tisp0b23cc9sjcc/diagram.png)
 
 ## Requirements and Dependencies
 - Go 1.11
