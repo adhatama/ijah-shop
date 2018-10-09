@@ -66,12 +66,8 @@ func (s *Server) Mount(e *echo.Group) {
 func (s *Server) SaveProduct(c echo.Context) error {
 	sku := c.FormValue("sku")
 	name := c.FormValue("name")
-	initialQuantity, err := strconv.Atoi(c.FormValue("initial_quantity"))
-	if err != nil {
-		return c.JSON(http.StatusInternalServerError, err)
-	}
 
-	product, err := domain.NewProduct(s.ProductService, sku, name, initialQuantity)
+	product, err := domain.NewProduct(s.ProductService, sku, name)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, err)
 	}
@@ -194,12 +190,12 @@ func (s *Server) ReceiveOrder(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, err)
 	}
 
-	err = prod.Add(quantity)
-	if err != nil {
-		log.Error(err.Error())
-		tx.Rollback()
-		return c.JSON(http.StatusInternalServerError, err)
-	}
+	// err = prod.Add(quantity)
+	// if err != nil {
+	// 	log.Error(err.Error())
+	// 	tx.Rollback()
+	// 	return c.JSON(http.StatusInternalServerError, err)
+	// }
 
 	// Persists
 
@@ -285,11 +281,11 @@ func (s *Server) SaveOutgoingProduct(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, err)
 	}
 
-	err = prod.Take(quantity)
-	if err != nil {
-		tx.Rollback()
-		return c.JSON(http.StatusInternalServerError, err)
-	}
+	// err = prod.Take(quantity)
+	// if err != nil {
+	// 	tx.Rollback()
+	// 	return c.JSON(http.StatusInternalServerError, err)
+	// }
 
 	// Persists
 
