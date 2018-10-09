@@ -88,3 +88,11 @@ type IncomingProductRepository interface {
 	FindByIDAndSKU(id, sku string, config ...*RepoConfig) (*domain.IncomingProduct, error)
 	FindByUID(uid uuid.UUID, config ...*RepoConfig) (*domain.IncomingProduct, error)
 }
+
+type OutgoingProductRepository interface {
+	Save(product *domain.OutgoingProduct, config ...*RepoConfig) error
+	FindAll() ([]*domain.OutgoingProduct, error)
+	FindByID(id string, config ...*RepoConfig) ([]*domain.OutgoingProduct, error)
+	FindByIDAndSKU(id, sku string, config ...*RepoConfig) (*domain.OutgoingProduct, error)
+	FindByUID(uid uuid.UUID, config ...*RepoConfig) (*domain.OutgoingProduct, error)
+}

@@ -24,8 +24,14 @@ func (p *Product) ChangeName(name string) error {
 	return nil
 }
 
-func (p *Product) AddStock(quantity int) error {
-	p.AvailableStock = p.AvailableStock + quantity
+func (p *Product) Add(quantity int) error {
+	p.AvailableStock += quantity
+
+	return nil
+}
+
+func (p *Product) Take(quantity int) error {
+	p.AvailableStock -= quantity
 
 	return nil
 }

@@ -18,6 +18,7 @@ type Server struct {
 	ProductRepo         db.ProductRepository
 	ProductService      domain.ProductService
 	IncomingProductRepo db.IncomingProductRepository
+	OutgoingProductRepo db.OutgoingProductRepository
 }
 
 func NewServer(db *db.DB) (*Server, error) {
@@ -26,6 +27,10 @@ func NewServer(db *db.DB) (*Server, error) {
 	}
 
 	incomingProductRepo := &mysql.IncomingProductRepositoryMysql{
+		Querier: db.DB,
+	}
+
+	outgoingProductRepo := &mysql.OutgoingProductRepositoryMysql{
 		Querier: db.DB,
 	}
 
@@ -38,6 +43,7 @@ func NewServer(db *db.DB) (*Server, error) {
 		ProductRepo:         productRepo,
 		ProductService:      productService,
 		IncomingProductRepo: incomingProductRepo,
+		OutgoingProductRepo: outgoingProductRepo,
 	}
 
 	return server, nil
@@ -48,8 +54,13 @@ func (s *Server) Mount(e *echo.Group) {
 	e.GET("/products", s.GetProducts)
 	e.GET("/products/:sku", s.GetProductBySKU)
 
+	e.GET("/incoming_products", s.GetIncomingProducts)
 	e.POST("/incoming_products", s.SaveIncomingProduct)
 	e.POST("/receive_orders", s.ReceiveOrder)
+
+	e.POST("/outgoing_products", s.SaveOutgoingProduct)
+	e.GET("/outgoing_products", s.GetOutgoingProducts)
+
 }
 
 func (s *Server) SaveProduct(c echo.Context) error {
@@ -183,7 +194,7 @@ func (s *Server) ReceiveOrder(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, err)
 	}
 
-	err = prod.AddStock(quantity)
+	err = prod.Add(quantity)
 	if err != nil {
 		log.Error(err.Error())
 		tx.Rollback()
@@ -212,6 +223,104 @@ func (s *Server) ReceiveOrder(c echo.Context) error {
 
 	data := make(map[string]interface{})
 	data["data"] = incProd
+
+	return c.JSON(http.StatusOK, data)
+}
+
+func (s *Server) GetIncomingProducts(c echo.Context) error {
+	incProds, err := s.IncomingProductRepo.FindAll()
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, err)
+	}
+
+	data := make(map[string]interface{})
+	data["data"] = incProds
+
+	return c.JSON(http.StatusOK, data)
+}
+
+func (s *Server) SaveOutgoingProduct(c echo.Context) error {
+	id := c.FormValue("id")
+	sku := c.FormValue("sku")
+	outgoingType := c.FormValue("type")
+	description := c.FormValue("description")
+
+	quantity, err := strconv.Atoi(c.FormValue("quantity"))
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, err)
+	}
+	price, err := strconv.Atoi(c.FormValue("price"))
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, err)
+	}
+	date, err := time.Parse("2006-01-02", c.FormValue("date"))
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, err)
+	}
+
+	// Begin processing
+
+	tx, err := s.DB.Begin()
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, err)
+	}
+
+	repoConfig := &db.RepoConfig{
+		Tx: &db.Tx{tx},
+	}
+
+	// Gather data
+
+	prod, err := s.ProductRepo.FindBySKU(sku, repoConfig)
+	if err != nil {
+		tx.Rollback()
+		return c.JSON(http.StatusInternalServerError, err)
+	}
+
+	// Process
+
+	outProd, err := domain.NewOutgoingProduct(id, sku, quantity, price, outgoingType, description, date)
+	if err != nil {
+		tx.Rollback()
+		return c.JSON(http.StatusInternalServerError, err)
+	}
+
+	err = prod.Take(quantity)
+	if err != nil {
+		tx.Rollback()
+		return c.JSON(http.StatusInternalServerError, err)
+	}
+
+	// Persists
+
+	err = s.OutgoingProductRepo.Save(outProd, repoConfig)
+	if err != nil {
+		tx.Rollback()
+		return c.JSON(http.StatusInternalServerError, err)
+	}
+
+	err = s.ProductRepo.Save(prod, repoConfig)
+	if err != nil {
+		tx.Rollback()
+		return c.JSON(http.StatusInternalServerError, err)
+	}
+
+	tx.Commit()
+
+	data := make(map[string]interface{})
+	data["data"] = outProd
+
+	return c.JSON(http.StatusOK, data)
+}
+
+func (s *Server) GetOutgoingProducts(c echo.Context) error {
+	outProds, err := s.OutgoingProductRepo.FindAll()
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, err)
+	}
+
+	data := make(map[string]interface{})
+	data["data"] = outProds
 
 	return c.JSON(http.StatusOK, data)
 }
