@@ -3,6 +3,8 @@
 The implementation of the well-known interview test Ijah Shop. The goal is to design and implement a system based from the existing Ijah's Excel inventory management.  
 For the complete instruction, please see [this link](https://www.dropbox.com/s/7omfzk55284omjd/ijah.pdf?dl=0)
 
+**Disclaimer: I didn't apply to that company for an interview. This repo is just for my attempt to implement Go architecture for learning purposes.**
+
 ## Architecture Overview
 
 It uses Onion / Hexagonal / Clean architectures in a simpler way. It uses 3 layers: the deepest domain layer, the infrastructure (databases), and the application layer (http server, serialization, etc)
